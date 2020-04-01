@@ -42,26 +42,25 @@ fn main() {
     //                                                     Given Data
 
     let time_data = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
-    let position_data = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+    let position_data = time_data.iter().map(|t: &f64| -f64::cos(*t)).collect();
 
     //_______________________________________________________________
     //                                            Simulate Population
 
-    // let expr = parser.from_description("TIME");
-    // let fitness = expr.fitness(&time_data, &position_data);
-
-    // println!("Fitness = {}", fitness);
     let mut population = Population::new(time_data, position_data);
 
-    population.grow(&parser, 300);
+    let population_size = 300;
+    let num_generations = 10;
 
-    for _ in 0..10 {
+    population.grow(&parser, population_size);
+
+    for _ in 0..num_generations {
         population.population.sort();
         println!("_________________________\n\
         Generation {}:", 
         population.generation);
 
-        for individual in population.population.iter() {
+        for individual in population.population.iter().take(10) {
             println!("{}, fitness = {}", individual.expr.description(), individual.fitness);
         }
         population.evolve();
