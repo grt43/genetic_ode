@@ -8,7 +8,7 @@ use rand;
 use rand::Rng;
 
 // Internal imports.
-use crate::operator::{Operator, OperatorMap};
+use crate::operator::{Operator, ToOperator, OperatorMap};
 
 // Seperating character for printing. Note that we only allow alphanumeric 
 // characters for operator tokens.
@@ -51,8 +51,8 @@ impl<'a> Expr {
                     args_needed -= 1;
                 },
                 2 => { // Anonymous Constant
-                    let c = rng.gen_range(-100.0f64, 100.0f64).to_bits();
-                    operators.push(Operator::Constant(c));
+                    let c: f64 = rng.gen_range(-100.0, 100.0);
+                    operators.push(c.to_operator());
                     args_needed -= 1;
                 },
                 _ => { // Operator
@@ -212,6 +212,16 @@ impl<'a> Expr {
         operators.extend_from_slice(&self.0[(end+1)..]);
 
         return Expr(operators);
+    }
+
+    pub fn mutate(&mut self) -> Expr {
+        let rand = rand::random::<bool>();
+        let var = match rand {
+            true => Operator::Time,
+            false => Operator::Position,
+        };
+        let expr = Expr(vec![var]);
+        return self.crossover(&expr);
     }
 }
 

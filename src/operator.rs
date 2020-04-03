@@ -11,7 +11,7 @@ const TIME_TOKEN: &'static str = "TIME";
 const POS_TOKEN: &'static str = "POS";
 
 //_____________________________________________________________________________
-//                                                                Operator Type
+//                                                      Operator Type and Trait
 
 #[derive(Copy, Clone)]
 #[derive(PartialEq, Eq, Hash)] // Required for use as keys in HashMap.
@@ -24,6 +24,36 @@ pub enum Operator {
     Constant(u64),
     Unary(fn(f64) -> f64),
     Binary(fn(f64, f64) -> f64),
+}
+
+// Implement a trait for the above specified types to more easily convert to an 
+// operator type.
+pub trait ToOperator {
+    fn to_operator(&self) -> Operator;
+}
+
+impl ToOperator for Operator {
+    fn to_operator(&self) -> Operator {
+        return *self;
+    }
+}
+
+impl ToOperator for f64 {
+    fn to_operator(&self) -> Operator {
+        return Operator::Constant(self.to_bits());
+    }
+}
+
+impl ToOperator for fn(f64) -> f64 {
+    fn to_operator(&self) -> Operator {
+        return Operator::Unary(*self);
+    }
+}
+
+impl ToOperator for fn(f64, f64) -> f64 {
+    fn to_operator(&self) -> Operator {
+        return Operator::Binary(*self);
+    }
 }
 
 //_____________________________________________________________________________
@@ -66,7 +96,8 @@ impl<'a> OperatorMap<'a> {
     *     operator - Instance of operator struct (see above).
     *     token - Name of operator.
     */
-    pub fn insert(&mut self, operator: Operator, token: &'a str) {
+    pub fn insert<T>(&mut self, operator: T, token: &'a str)
+        where T: ToOperator {
         // Ensure adherence to token specifications.
         if !token.chars().all(|c: char| c.is_alphanumeric()) {
             panic!("Token {} invalid, \
@@ -77,7 +108,7 @@ impl<'a> OperatorMap<'a> {
                 cannot begin with numeric characters.",
                 token);
         } else {
-            self.map.insert(operator, token);
+            self.map.insert(operator.to_operator(), token);
         }
     }
 

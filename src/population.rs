@@ -145,7 +145,7 @@ impl<'a> Population {
             let base_expr = &ind1.expr;
             let sub_expr = ind2.expr.sub_expr();
 
-            let expr = base_expr.crossover(&sub_expr);
+            let expr = base_expr.crossover(&sub_expr).mutate();
             let fitness = diff_eq::fitness(
                 &expr,
                 &mut self.times.iter(), 
