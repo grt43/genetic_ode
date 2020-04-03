@@ -1,6 +1,6 @@
 [package]
 name = "genetic_ode"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Garrett Tetrault"]
 edition = "2018"
 

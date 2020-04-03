@@ -9,23 +9,22 @@ use rand::Rng;
 use rand_distr::Exp;
 
 // Internal imports.
-use crate::expr::{
-    Expr,
-    ExprParser,
-};
+use crate::operator::{Operator, OperatorMap};
+use crate::expr::{Expr, diff_eq};
+
+const TIME_STEP: f64 = 0.01;
 
 //_____________________________________________________________________________
 //                                                       Individual Type & Impl
 
 #[derive(Clone)]
-pub struct Individual<'a> {
+pub struct Individual {
     pub fitness: f64,
-    pub expr: Expr<'a>,
+    pub expr: Expr,
 }
 
 // Implement an ordering to allow for sorting.
-
-impl<'a> Ord for Individual<'a> {
+impl Ord for Individual {
     fn cmp(&self, other: &Self) -> Ordering {
         return match (self.fitness.is_nan(), other.fitness.is_nan()) {
             (true, true) => Ordering::Equal,
@@ -36,54 +35,51 @@ impl<'a> Ord for Individual<'a> {
     }
 }
 
-impl<'a> PartialOrd for Individual<'a> {
+impl PartialOrd for Individual {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         return Some(self.cmp(other));
     }
 }
 
-impl<'a> PartialEq for Individual<'a> {
+impl PartialEq for Individual {
     fn eq(&self, other: &Self) -> bool {
         return self.fitness == other.fitness;
     }
 }
 
-impl<'a> Eq for Individual<'a> { }
+impl Eq for Individual { }
 
 
 //_____________________________________________________________________________
 //                                                       Population Type & Impl
 
-pub struct Population<'a> {
+pub struct Population {
     // Data we are trying to fit.
-    time_data: Vec<f64>,
-    position_data: Vec<f64>,
+    times: Vec<f64>,
+    positions: Vec<f64>,
 
     // Information on the population.
-    pub population: Vec<Individual<'a>>,
+    pub population: Vec<Individual>,
     pub generation: u64,
 }
 
-impl<'a> Population<'a> {
+impl<'a> Population {
 
     /* new
     */
-    pub fn new(time_data: Vec<f64>, position_data: Vec<f64>) -> Population<'a> {
-        if time_data.len() != position_data.len() {
-            panic!(
-                "Time and position data \
-                must be of equal lengths.");
+    pub fn new(times: Vec<f64>, positions: Vec<f64>) -> Population {
+        if times.len() != positions.len() {
+            panic!("Time and position data must be of equal lengths.");
         }
-        if time_data.len() == 0 {
-            panic!(
-                "Time and position data \
-                cannot be emtpy.");
+        if times.len() == 0 {
+            panic!("Time and position data cannot be emtpy.");
         }
 
         let population = Vec::new();
         let generation = 0;
+
         return Population {
-            time_data, position_data, 
+            times, positions, 
             population, generation
         };
     }
@@ -91,46 +87,57 @@ impl<'a> Population<'a> {
     /* grow
     * Grow the population by the specified number of individuals.
     */
-    pub fn grow(&mut self, parser: &'a ExprParser<'a>, n: usize) {
+    pub fn grow(&mut self, n: usize, map: &'a OperatorMap) {
         for _ in 0..n {
-            let expr = parser.generate();
-            let fitness = expr.fitness(&self.time_data, &self.position_data);
+            let expr = Expr::generate(map);
+            let fitness = diff_eq::fitness(
+                &expr,
+                &mut self.times.iter(), 
+                &mut self.positions.iter(),
+                TIME_STEP);
             
-            let individual = Individual {fitness, expr: expr};
+            let individual = Individual {fitness, expr};
             self.population.push(individual);
         }
     }
 
     /* best_fit
     */
-    pub fn best_fit(&mut self) -> Expr<'a> {
+    pub fn best_fit(&mut self) -> &Individual {
         self.population.sort();
         let individual = self.population.iter().next().unwrap();
-        return individual.expr.clone();
+        return &individual;
     }
 
     /* evolve
     */
     pub fn evolve(&mut self) {
-        self.population.sort();
-        let pop_len = self.population.len();
-        let min_fitness = self.population.iter().min().unwrap().fitness;
+        let size = self.population.len();
+
+        if size == 0 {
+            panic!("Cannot evolve population with no individuals.");
+        }
+
+        // Note that the population is sorted when we call best_fit.
+        let min_fitness = self.best_fit().fitness;
 
         // Build new population and keep the top 10% unchagned.
-        let num_unchanged = self.population.len() / 10;
+        let num_unchanged = size / 10;
         let mut new_population = self.population[0..num_unchanged].to_vec();
 
         // Initialize random number generator.
         let mut rng = rand::thread_rng();
 
-        let lambda = 0.1;
-        let exp_dist = Exp::new(lambda).unwrap();
+        // We will use the Pareto distribution due to its heavier tails than 
+        // alternatives (like the exponential distribution).
+        let lambda = 0.5;
+        let exp_distr = Exp::new(lambda).unwrap();
 
         // Generate the rest of the new population by crossover.
-        for _ in 0..(pop_len - num_unchanged) {
+        for _ in 0..(size - num_unchanged) {
             // Generate random fitnesses.
-            let rand1 = rng.sample(exp_dist) + min_fitness;
-            let rand2 = rng.sample(exp_dist) + min_fitness;
+            let rand1 = rng.sample(exp_distr);
+            let rand2 = rng.sample(exp_distr);
 
             let ind1 = self.closest(rand1);
             let ind2 = self.closest(rand2);
@@ -138,8 +145,12 @@ impl<'a> Population<'a> {
             let base_expr = &ind1.expr;
             let sub_expr = ind2.expr.sub_expr();
 
-            let expr = base_expr.crossover(sub_expr);
-            let fitness = expr.fitness(&self.time_data, &self.position_data);
+            let expr = base_expr.crossover(&sub_expr);
+            let fitness = diff_eq::fitness(
+                &expr,
+                &mut self.times.iter(), 
+                &mut self.positions.iter(),
+                TIME_STEP);
 
             let individual = Individual {fitness, expr: expr};
             new_population.push(individual);
@@ -152,24 +163,24 @@ impl<'a> Population<'a> {
     /* closest
     * Find the individual with a fitness closest to the given value.
     */
-    fn closest(&self, num: f64) -> &Individual<'a> {
-        let mut pop_iter = self.population.iter();
+    fn closest(&self, num: f64) -> &Individual {
+        let mut iter = self.population.iter();
 
-        let mut prev_ind = pop_iter.next();
-        let mut next_ind = pop_iter.next();
+        let mut prev = iter.next();
+        let mut next = iter.next();
 
-        while next_ind != None {
-            if prev_ind.unwrap().fitness <= num &&
-                next_ind.unwrap().fitness >= num {
-                    return prev_ind.unwrap();
+        while next != None {
+            if prev.unwrap().fitness <= num &&
+                next.unwrap().fitness >= num {
+                    return prev.unwrap();
                 } 
 
-            prev_ind = next_ind;
-            next_ind = pop_iter.next();
+            prev = next;
+            next = iter.next();
         }
 
         // If we don't find a closest individual, we return the first 
         // individiual in our population.
-        return self.population.iter().next().unwrap();
+        return prev.unwrap();
     }
 }

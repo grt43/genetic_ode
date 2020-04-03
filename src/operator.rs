@@ -2,37 +2,50 @@
 // Author: Garrett Tetrault
 // Test ground (for now) of expresion parsing for a genetic program.
 //_____________________________________________________________________________
+
 // External imports.
 use std::collections::HashMap;
 use rand;
 
-// Interal imports.
-use crate::expr::{
-    TIME_SYMBOL,
-    POSITION_SYMBOL,
-    SEP_CHAR,
-};
+const TIME_TOKEN: &'static str = "TIME";
+const POS_TOKEN: &'static str = "POS";
 
 //_____________________________________________________________________________
 //                                                                Operator Type
+
+#[derive(Copy, Clone)]
+#[derive(PartialEq, Eq, Hash)] // Required for use as keys in HashMap.
 pub enum Operator {
+    Time,
+    Position,
+    Constant(fn() -> f64),
     Unary(fn(f64) -> f64),
     Binary(fn(f64, f64) -> f64),
 }
 
 //_____________________________________________________________________________
 //                                                      OperatorMap Type & Impl
-pub struct OperatorMap<'a>(HashMap<&'a str, Operator>);
+
+pub struct OperatorMap<'a> {
+    map: HashMap<Operator, &'a str>,
+}
 
 impl<'a> OperatorMap<'a> {
-	/* new
-    * Create a new instance of OperatorMap and ready the operator map.
+    /* new
+    * Create a new instance of OperatorMap that contains time and position with
+    * the corresponding tokens declared as constants above.
     * Output:
     *     OperatorMap struct.
     */
     pub fn new() -> OperatorMap<'a> {
-        let map = HashMap::new();
-        return OperatorMap(map);
+        let mut map = HashMap::new();
+
+        // Time and position are required to be in the map.
+        // Note that this allows us to assume the map is not empty.
+        map.insert(Operator::Time, TIME_TOKEN);
+        map.insert(Operator::Position, POS_TOKEN);
+
+        return OperatorMap {map};
     }
 
     /* len
@@ -41,72 +54,54 @@ impl<'a> OperatorMap<'a> {
     *     Size of operator map as usize.
     */
     fn len(&self) -> usize {
-        return self.0.len();
+        return self.map.len();
     }
 
     /* insert
-    * Insert a given symbol and corresponding operator into the map.
+    * Insert a given operator and corresponding token into the map.
     * Input:
-    *     symbol - Name of operator.
-    *     operator - Function pointer to operator, either unary or binary.
+    *     operator - Instance of operator struct (see above).
+    *     token - Name of operator.
     */
-    pub fn insert(&mut self, symbol: &'a str, operator: Operator) {
-        // Ensure adherence to oeprator symbol specs listed above.
-        if symbol == TIME_SYMBOL || symbol == POSITION_SYMBOL {
-            panic!(
-                "Operator symbol \'{}\' \
-                conflicts with reserved symbols.", 
-                symbol);
-        } else if symbol.contains(SEP_CHAR) {
-            panic!(
-                "Operator symbol \'{}\' \
-                cannot contain a \'{}\'.", 
-                symbol,
-                SEP_CHAR);
-        } else if symbol.starts_with(|c: char| c.is_numeric()) {
-            panic!(
-                "Operator symbol \'{}\' \
-                cannot begin with numerical character.", 
-                symbol);
-        } else { 
-            self.0.insert(symbol, operator);
+    pub fn insert(&mut self, operator: Operator, token: &'a str) {
+        // Ensure adherence to token specifications.
+        if !token.chars().all(|c: char| c.is_alphanumeric()) {
+            panic!("Token {} invalid, \
+                cannot contain non-alphanumeric characters.",
+                token);
+        } else if token.starts_with(|c: char| c.is_numeric()) {
+            panic!("Token {} invalid, \
+                cannot begin with numeric characters.",
+                token);
+        } else {
+            self.map.insert(operator, token);
         }
     }
 
     /* get
-    * Get the operator correpsonding to the given symbol from our map.
+    * Get the token correpsonding to the given operator from our map.
     * Input:
-    *     symbol - Name of operator.
+    *     operator - A reference to an operator.
     * Output:
-    *     Reference to the desired operator. 
+    *     The token of the operator. 
     */
-    pub fn get(&self, symbol: &'a str) -> &Operator {
-        let operator =  match self.0.get(symbol) {
-            Some(op) => op,
-            None => {
-                panic!(
-                    "Operator symbol \'{}\' \
-                    is not contained in the map.", 
-                    symbol);
-            },
+    pub fn get(&self, operator: &'a Operator) -> &str {
+        return match self.map.get(operator) {
+            Some(token) => token,
+            None => panic!(
+                "Operator is not contained in the map."),
         };
-
-        return operator;
     }
 
-    /* get_random
+    /* rand_operator
     * Get a random operator from our map.
     * Output:
     *     Reference to an operator. 
     */
-    pub fn get_random(&self) -> (&str, &Operator) {
-        let idx: usize = rand::random::<usize>() % self.len();
-        match self.0.iter().skip(idx).next() {
-            Some((name, operator)) => return (name, operator),
-            None => {
-                panic!(
-                    "Empty map, cannot get random element.");
-            },
-        }
+    pub fn rand_operator(&self) -> &Operator {
+        let idx = rand::random::<usize>() % self.len();
+
+        // Note that there are at least two elements in map from new.
+        return self.map.keys().skip(idx).next().unwrap();
     }
 }
