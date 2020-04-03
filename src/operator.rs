@@ -17,8 +17,11 @@ const POS_TOKEN: &'static str = "POS";
 #[derive(PartialEq, Eq, Hash)] // Required for use as keys in HashMap.
 pub enum Operator {
     Time,
-    Position,
-    Constant(fn() -> f64),
+    Position, 
+    // We store constants as the bits of a float. Note that most constants 
+    // declared will be anonymous. That is, they won't be contained within the
+    // operator map, only within expressions.
+    Constant(u64),
     Unary(fn(f64) -> f64),
     Binary(fn(f64, f64) -> f64),
 }
@@ -85,12 +88,8 @@ impl<'a> OperatorMap<'a> {
     * Output:
     *     The token of the operator. 
     */
-    pub fn get(&self, operator: &'a Operator) -> &str {
-        return match self.map.get(operator) {
-            Some(token) => token,
-            None => panic!(
-                "Operator is not contained in the map."),
-        };
+    pub fn get(&self, operator: &'a Operator) -> Option<&&str> {
+        return self.map.get(operator);
     }
 
     /* rand_operator

@@ -21,12 +21,6 @@ const SEP_CHAR: char = ' ';
 pub struct Expr(Vec<Operator>);
 
 impl<'a> Expr {
-    /* new
-    */
-    pub fn new(expr: Vec<Operator>) -> Expr {
-        return Expr(expr);
-    }
-
     /* generate
     * Generate a random expression using operators from our given map.
     * Output:
@@ -56,6 +50,11 @@ impl<'a> Expr {
                     operators.push(Operator::Position);
                     args_needed -= 1;
                 },
+                2 => { // Anonymous Constant
+                    let c = rng.gen_range(-100.0f64, 100.0f64).to_bits();
+                    operators.push(Operator::Constant(c));
+                    args_needed -= 1;
+                },
                 _ => { // Operator
                     let operator = map.rand_operator();
                     operators.push(*operator);
@@ -83,7 +82,17 @@ impl<'a> Expr {
         let mut description = String::from("");
         for operator in self.0.iter() {
             let token = map.get(operator);
-            description.push_str(token);
+            match token {
+                Some(token) => description.push_str(token),
+                None => {
+                    // Test if it is an anonymous constant.
+                    match operator {
+                        Operator::Constant(c) => 
+                            description.push_str(&f64::from_bits(*c).to_string()),
+                        _ => panic!("Encountered operator not in map."),
+                    }
+                },
+            }
             description.push(SEP_CHAR);
         }
         return description;
@@ -104,7 +113,7 @@ impl<'a> Expr {
             match operator {
                 Operator::Time => stack.push(time),
                 Operator::Position => stack.push(position),
-                Operator::Constant(f) => stack.push(f()),
+                Operator::Constant(c) => stack.push(f64::from_bits(*c)),
 
                 // TODO: We are assuming here that the expression is valid.
                 //       Need to account for case where it is not.
@@ -210,7 +219,6 @@ impl<'a> Expr {
 //                                                               ODE Simulation
 pub mod diff_eq {
     use crate::expr::Expr;
-    use crate::operator::{Operator, OperatorMap};
 
     /* fitness
     * Compute the fitness of an individual against some given data. We asssume 

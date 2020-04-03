@@ -9,7 +9,6 @@ mod expr;
 mod population;
 
 use operator::{Operator, OperatorMap};
-use expr::{Expr, diff_eq};
 use population::Population;
 
 fn main() {
@@ -27,8 +26,8 @@ fn main() {
     map.insert(Operator::Unary(f64::sin), "SIN");
     map.insert(Operator::Unary(f64::tan), "TAN");
 
-    map.insert(Operator::Constant(|| 1.0), "ONE");
-    map.insert(Operator::Constant(|| 3.14159), "PI");
+    map.insert(Operator::Constant(1.0f64.to_bits()), "ONE");
+    map.insert(Operator::Constant(3.14159f64.to_bits()), "PI");
 
     let times = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0];
     let positions = vec![0.0, 1.0, 4.0, 9.0, 16.0, 25.0];

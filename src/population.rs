@@ -9,7 +9,7 @@ use rand::Rng;
 use rand_distr::Exp;
 
 // Internal imports.
-use crate::operator::{Operator, OperatorMap};
+use crate::operator::OperatorMap;
 use crate::expr::{Expr, diff_eq};
 
 const TIME_STEP: f64 = 0.01;
@@ -136,8 +136,8 @@ impl<'a> Population {
         // Generate the rest of the new population by crossover.
         for _ in 0..(size - num_unchanged) {
             // Generate random fitnesses.
-            let rand1 = rng.sample(exp_distr);
-            let rand2 = rng.sample(exp_distr);
+            let rand1 = rng.sample(exp_distr) + min_fitness;
+            let rand2 = rng.sample(exp_distr) + min_fitness;
 
             let ind1 = self.closest(rand1);
             let ind2 = self.closest(rand2);
