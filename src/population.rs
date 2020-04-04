@@ -130,7 +130,7 @@ impl<'a> Population {
 
         // We will use the Pareto distribution due to its heavier tails than 
         // alternatives (like the exponential distribution).
-        let lambda = 0.5;
+        let lambda = 0.1;
         let exp_distr = Exp::new(lambda).unwrap();
 
         // Generate the rest of the new population by crossover.
@@ -139,13 +139,22 @@ impl<'a> Population {
             let rand1 = rng.sample(exp_distr) + min_fitness;
             let rand2 = rng.sample(exp_distr) + min_fitness;
 
+            // Get two individuals, randomly chosen proportionally to their 
+            // fitness, and crossover.
             let ind1 = self.closest(rand1);
             let ind2 = self.closest(rand2);
 
             let base_expr = &ind1.expr;
             let sub_expr = ind2.expr.sub_expr();
 
-            let expr = base_expr.crossover(&sub_expr).mutate();
+            let mut expr = base_expr.crossover(&sub_expr);
+
+            // Possibly mutate expression.
+            if rng.gen::<f64>() > 0.75 {
+                expr = expr.mutate();
+            }
+
+            // Test how well the new expression fits the data.
             let fitness = diff_eq::fitness(
                 &expr,
                 &mut self.times.iter(), 

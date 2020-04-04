@@ -33,16 +33,20 @@ fn main() {
     map.insert(f64::ln as fn(f64) -> f64, "LN");
 
     // We can use named constants too.
-    map.insert(3.0, "THREE");
+    map.insert(1.0, "ONE");
     map.insert(3.14159, "PI");
 
     // Specify data.
-    let times = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0];
-    let positions = vec![0.0, 3.0, 6.0, 9.0, 12.0, 15.0];
+    let times = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+
+    let positions = 
+        times.iter()
+        .map(|x: &f64| x.exp() / (1.0 + x.exp()))
+        .collect();
 
     // Construct population and simulate.
     let size = 300;
-    let generations = 10;
+    let generations = 15;
     let mut population = Population::new(times, positions);
     population.grow(size, &map);
 

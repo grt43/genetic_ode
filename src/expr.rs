@@ -51,7 +51,7 @@ impl<'a> Expr {
                     args_needed -= 1;
                 },
                 2 => { // Anonymous Constant
-                    let c: f64 = rng.gen_range(-100.0, 100.0);
+                    let c: f64 = rng.gen_range(-10.0, 10.0);
                     operators.push(c.to_operator());
                     args_needed -= 1;
                 },
