@@ -5,7 +5,7 @@
 // #![allow(dead_code)]
 
 mod operator;
-mod expr;
+mod ode;
 mod population;
 
 use operator::OperatorMap;

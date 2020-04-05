@@ -10,7 +10,7 @@ use rand_distr::Exp;
 
 // Internal imports.
 use crate::operator::OperatorMap;
-use crate::expr::{Expr, diff_eq};
+use crate::ode::{State, Expr};
 
 const TIME_STEP: f64 = 0.01;
 
@@ -55,8 +55,7 @@ impl Eq for Individual { }
 
 pub struct Population {
     // Data we are trying to fit.
-    times: Vec<f64>,
-    positions: Vec<f64>,
+    states: Vec<State>,
 
     // Information on the population.
     pub population: Vec<Individual>,
@@ -75,12 +74,18 @@ impl<'a> Population {
             panic!("Time and position data cannot be emtpy.");
         }
 
+        let states = 
+            times.iter().zip(positions.iter())
+            .map(|state: (&f64, &f64)| State::new(*state.0, *state.1))
+            .collect();
+
         let population = Vec::new();
         let generation = 0;
 
         return Population {
-            times, positions, 
-            population, generation
+            states, 
+            population, 
+            generation,
         };
     }
 
@@ -90,11 +95,7 @@ impl<'a> Population {
     pub fn grow(&mut self, n: usize, map: &'a OperatorMap) {
         for _ in 0..n {
             let expr = Expr::generate(map);
-            let fitness = diff_eq::fitness(
-                &expr,
-                &mut self.times.iter(), 
-                &mut self.positions.iter(),
-                TIME_STEP);
+            let fitness = expr.fitness(&self.states, TIME_STEP);
             
             let individual = Individual {fitness, expr};
             self.population.push(individual);
@@ -132,36 +133,21 @@ impl<'a> Population {
         // alternatives (like the exponential distribution).
         let lambda = 0.1;
         let exp_distr = Exp::new(lambda).unwrap();
+        let mut get_rand = || rng.sample(exp_distr) + min_fitness;
 
         // Generate the rest of the new population by crossover.
         for _ in 0..(size - num_unchanged) {
-            // Generate random fitnesses.
-            let rand1 = rng.sample(exp_distr) + min_fitness;
-            let rand2 = rng.sample(exp_distr) + min_fitness;
-
             // Get two individuals, randomly chosen proportionally to their 
             // fitness, and crossover.
-            let ind1 = self.closest(rand1);
-            let ind2 = self.closest(rand2);
+            let expr1 = &self.closest(get_rand()).expr;
+            let expr2 = &self.closest(get_rand()).expr;
 
-            let base_expr = &ind1.expr;
-            let sub_expr = ind2.expr.sub_expr();
-
-            let mut expr = base_expr.crossover(&sub_expr);
-
-            // Possibly mutate expression.
-            if rng.gen::<f64>() > 0.75 {
-                expr = expr.mutate();
-            }
+            let expr = expr1.crossover(expr2).mutate();
 
             // Test how well the new expression fits the data.
-            let fitness = diff_eq::fitness(
-                &expr,
-                &mut self.times.iter(), 
-                &mut self.positions.iter(),
-                TIME_STEP);
+            let fitness = expr.fitness(&self.states, TIME_STEP);
 
-            let individual = Individual {fitness, expr: expr};
+            let individual = Individual {fitness, expr};
             new_population.push(individual);
         }
 
